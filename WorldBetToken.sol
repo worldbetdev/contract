@@ -542,7 +542,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     string public constant _name = "World Bet Token";
     string public constant _symbol = "WBT";
-    uint8 public constant _decimals = 5;
+    uint8 public constant _decimals = 18;
 
     IPancakeSwapPair public pairContract;
     mapping(address => bool) _isFeeExempt;
@@ -552,12 +552,11 @@ contract WorldBetToken is ERC20Detailed, Ownable {
         _;
     }
 
-    uint256 public constant DECIMALS = 18;
     uint256 public constant MAX_UINT256 = ~uint256(0);
     uint8 public constant RATE_DECIMALS = 7;
 
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY =
-        100 * 10**6 * 10**DECIMALS;
+        100 * 10**6 * 10**_decimals;
 
     // Buy 6%, Sell, 8%
     uint256 public treasuryFee = 3;
@@ -601,7 +600,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     mapping(address => uint256) private _gonBalances;
     mapping(address => mapping(address => uint256)) private _allowedFragments;
 
-    constructor() ERC20Detailed(_name, _symbol, uint8(DECIMALS)) Ownable() {
+    constructor() ERC20Detailed(_name, _symbol, uint8(_decimals)) Ownable() {
         router = IPancakeSwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
 
         pair = IPancakeSwapFactory(router.factory()).createPair(
