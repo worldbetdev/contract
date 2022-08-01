@@ -558,13 +558,14 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY =
         100 * 10**6 * 10**_decimals;
 
-    // Buy 6%, Sell, 8%
-    uint256 public treasuryFee = 3;
+    // Buy 6%, Sell, 7%
+    uint256 public treasuryFee = 2;
     uint256 public rewardFee = 2;
     uint256 public burnFee = 1;
-    uint256 public sellFee = 2;
+    uint256 public liquidityFee = 1;
+    uint112 public sellFee = 1;
 
-    uint256 public totalFee = treasuryFee.add(rewardFee).add(burnFee);
+    uint256 public totalFee = treasuryFee.add(rewardFee).add(liquidityFee).add(burnFee);
 
     uint256 public constant feeDenominator = 100;
 
@@ -594,6 +595,8 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     uint256 private constant MAX_SUPPLY = INITIAL_FRAGMENTS_SUPPLY;
 
+    bool public _autoAddLiquidity;
+    uint256 public _lastAddLiquidityTime;
     uint256 public _totalSupply;
     uint256 private _gonsPerFragment;
 
@@ -620,6 +623,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
         _gonBalances[msg.sender] = TOTAL_GONS;
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
 
+        _autoAddLiquidity = true;
         _isFeeExempt[treasuryReceiver] = true;
         _isFeeExempt[rewardReceiver] = true;
         _isFeeExempt[msg.sender] = true;
@@ -672,6 +676,10 @@ contract WorldBetToken is ERC20Detailed, Ownable {
             return _basicTransfer(sender, recipient, amount);
         }
         
+        if (shouldAddLiquidity()) {
+            addLiquidity();
+        }
+
         if (shouldSwapBack()) {
             swapBack();
         }
@@ -700,6 +708,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     ) internal returns (uint256) {
         uint256 _totalFee = totalFee;
         uint256 activeTime = lastAntiTime + antiTime;
+
         if (recipient == pair) {
             _totalFee = totalFee.add(sellFee);
         }
@@ -710,9 +719,11 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
         uint256 feeAmount = gonAmount.mul(_totalFee).div(feeDenominator);
 
+        _gonBalances[address(this)] = _gonBalances[address(this)].add(feeAmount);
+
         _gonBalances[DEAD] = _gonBalances[DEAD].add(gonAmount.mul(burnFee).div(feeDenominator));
 
-        _gonBalances[address(this)] = _gonBalances[address(this)].add(feeAmount);
+        _gonBalances[treasuryReceiver] = _gonBalances[treasuryReceiver].add(gonAmount.mul(liquidityFee).div(feeDenominator));
 
         emit Transfer(sender, address(this), feeAmount.div(_gonsPerFragment));
         return gonAmount.sub(feeAmount);
@@ -760,6 +771,49 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     }
 
+    function addLiquidity() internal swapping {
+        uint256 autoLiquidityAmount = _gonBalances[treasuryReceiver].div(
+            _gonsPerFragment
+        );
+        _gonBalances[address(this)] = _gonBalances[address(this)].add(
+            _gonBalances[treasuryReceiver]
+        );
+        _gonBalances[treasuryReceiver] = 0;
+        uint256 amountToLiquify = autoLiquidityAmount.div(2);
+        uint256 amountToSwap = autoLiquidityAmount.sub(amountToLiquify);
+
+        if (amountToSwap == 0) {
+            return;
+        }
+        address[] memory path = new address[](2);
+        path[0] = address(this);
+        path[1] = router.WETH();
+
+        uint256 balanceBefore = address(this).balance;
+
+        router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+            amountToSwap,
+            0,
+            path,
+            address(this),
+            block.timestamp
+        );
+
+        uint256 amountETHLiquidity = address(this).balance.sub(balanceBefore);
+
+        if (amountToLiquify > 0 && amountETHLiquidity > 0) {
+            router.addLiquidityETH{value: amountETHLiquidity}(
+                address(this),
+                amountToLiquify,
+                0,
+                0,
+                treasuryReceiver,
+                block.timestamp
+            );
+        }
+        _lastAddLiquidityTime = block.timestamp;
+    }
+
     function withdrawAllToTreasury() external swapping onlyOwner {
         uint256 amountToSwap = _gonBalances[address(this)].div(
             _gonsPerFragment
@@ -790,6 +844,14 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     function shouldSwapBack() internal view returns (bool) {
         return !inSwap && msg.sender != pair;
+    }
+
+    function shouldAddLiquidity() internal view returns (bool) {
+        return
+            _autoAddLiquidity &&
+            !inSwap &&
+            msg.sender != pair &&
+            block.timestamp >= (_lastAddLiquidityTime + 720 minutes);
     }
 
     function allowance(address owner_, address spender)
@@ -878,6 +940,15 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     ) external onlyOwner {
         antiBotEnable = _antiBotEnable;
         lastAntiTime = block.timestamp;
+    }
+
+    function setAutoAddLiquidity(bool _flag) external onlyOwner {
+        if (_flag) {
+            _autoAddLiquidity = _flag;
+            _lastAddLiquidityTime = block.timestamp;
+        } else {
+            _autoAddLiquidity = _flag;
+        }
     }
 
     function getLiquidityBacking(uint256 accuracy)
