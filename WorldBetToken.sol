@@ -558,11 +558,11 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY =
         100 * 10**6 * 10**_decimals;
 
-    // Buy 6%, Sell, 7%
+    // Buy 7%, Sell, 8%
     uint256 public treasuryFee = 2;
     uint256 public rewardFee = 2;
     uint256 public burnFee = 1;
-    uint256 public liquidityFee = 1;
+    uint256 public liquidityFee = 2;
     uint112 public sellFee = 1;
 
     uint256 public totalFee = treasuryFee.add(rewardFee).add(liquidityFee).add(burnFee);
