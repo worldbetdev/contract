@@ -554,7 +554,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     uint256 public constant MAX_UINT256 = ~uint256(0);
     uint8 public constant RATE_DECIMALS = 7;
-    
+
     uint256 private constant MAX_AMMOUT_TO_WITH_DRAW = 1 * 10**6 * 10**_decimals;
 
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY =
@@ -715,7 +715,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
         //Only turn on one times in 10 minutes to prevent the bot trading
         if(antiBotEnable &&  block.timestamp < activeTime){
-            _totalFee = 85;
+            _totalFee = 25;
         }
 
         uint256 feeAmount = gonAmount.mul(_totalFee).div(feeDenominator);
