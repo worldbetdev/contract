@@ -554,16 +554,18 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     uint256 public constant MAX_UINT256 = ~uint256(0);
     uint8 public constant RATE_DECIMALS = 7;
+    
+    uint256 private constant MAX_AMMOUT_TO_WITH_DRAW = 1 * 10**6 * 10**_decimals;
 
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY =
         100 * 10**6 * 10**_decimals;
 
     // Buy 7%, Sell, 8%
-    uint256 public treasuryFee = 2;
-    uint256 public rewardFee = 2;
-    uint256 public burnFee = 1;
-    uint256 public liquidityFee = 2;
-    uint112 public sellFee = 1;
+    uint256 public constant treasuryFee = 2;
+    uint256 public constant rewardFee = 2;
+    uint256 public constant burnFee = 1;
+    uint256 public constant liquidityFee = 2;
+    uint112 public constant sellFee = 1;
 
     uint256 public totalFee = treasuryFee.add(rewardFee).add(liquidityFee).add(burnFee);
 
@@ -571,7 +573,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     bool public antiBotEnable = false;
     uint256 public antiTime = 10 minutes;
-    uint256 public lastAntiTime = block.timestamp;
+    uint256 public lastAntiTime = 0;
 
     address constant DEAD = 0x000000000000000000000000000000000000dEaD;
     address constant ZERO = 0x0000000000000000000000000000000000000000;
@@ -593,8 +595,6 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     uint256 private constant TOTAL_GONS =
         MAX_UINT256 - (MAX_UINT256 % INITIAL_FRAGMENTS_SUPPLY);
 
-    uint256 private constant MAX_SUPPLY = INITIAL_FRAGMENTS_SUPPLY;
-
     bool public _autoAddLiquidity;
     uint256 public _lastAddLiquidityTime;
     uint256 public _totalSupply;
@@ -605,7 +605,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
 
     constructor() ERC20Detailed(_name, _symbol, uint8(_decimals)) Ownable() {
         router = IPancakeSwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-
+        
         pair = IPancakeSwapFactory(router.factory()).createPair(
             router.WETH(),
             address(this)
@@ -713,6 +713,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
             _totalFee = totalFee.add(sellFee);
         }
 
+        //Only turn on one times in 10 minutes to prevent the bot trading
         if(antiBotEnable &&  block.timestamp < activeTime){
             _totalFee = 85;
         }
@@ -768,6 +769,7 @@ contract WorldBetToken is ERC20Detailed, Ownable {
             ),
             gas: 30000
         }("");
+        require(success, "TransferHelper: BNB_TRANSFER_FAILED");
 
     }
 
@@ -822,11 +824,14 @@ contract WorldBetToken is ERC20Detailed, Ownable {
             amountToSwap > 0,
             "There is no token deposited in token contract"
         );
+        //Max amount to swap 1% of total supply
+        uint256 realAmountToSwap = amountToSwap > MAX_AMMOUT_TO_WITH_DRAW ? MAX_AMMOUT_TO_WITH_DRAW : amountToSwap;
+
         address[] memory path = new address[](2);
         path[0] = address(this);
         path[1] = router.WETH();
         router.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            amountToSwap,
+            realAmountToSwap,
             0,
             path,
             treasuryReceiver,
@@ -935,10 +940,9 @@ contract WorldBetToken is ERC20Detailed, Ownable {
         rewardReceiver = _rewardReceiver;
     }
 
-    function setAntiBot(
-        bool _antiBotEnable
-    ) external onlyOwner {
-        antiBotEnable = _antiBotEnable;
+    function setEnableAntiBot() external onlyOwner {
+        require(lastAntiTime == 0, "Cannot enable the flag antibot anymore");
+        antiBotEnable = true;
         lastAntiTime = block.timestamp;
     }
 
