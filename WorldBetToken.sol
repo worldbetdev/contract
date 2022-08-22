@@ -1,5 +1,8 @@
-// SPDX-License-Identifier: MIT
+/**
+ *Submitted for verification at BscScan.com on 2022-08-21
+*/
 
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.7.4;
 
 interface IPancakeSwapFactory {
@@ -560,19 +563,18 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     uint256 private constant INITIAL_FRAGMENTS_SUPPLY =
         100 * 10**6 * 10**_decimals;
 
-    // Buy 7%, Sell, 8%
-    uint256 public constant treasuryFee = 2;
-    uint256 public constant rewardFee = 2;
-    uint256 public constant burnFee = 1;
-    uint256 public constant liquidityFee = 2;
-    uint112 public constant sellFee = 1;
+    uint256 public treasuryFee = 1;
+    uint256 public rewardFee = 1;
+    uint256 public burnFee = 1;
+    uint256 public liquidityFee = 1;
+    uint256 public sellFee = 1;
 
     uint256 public totalFee = treasuryFee.add(rewardFee).add(liquidityFee).add(burnFee);
 
     uint256 public constant feeDenominator = 100;
 
     bool public antiBotEnable = false;
-    uint256 public antiTime = 10 minutes;
+    uint256 public constant antiTime = 15 minutes;
     uint256 public lastAntiTime = 0;
 
     address constant DEAD = 0x000000000000000000000000000000000000dEaD;
@@ -713,7 +715,6 @@ contract WorldBetToken is ERC20Detailed, Ownable {
             _totalFee = totalFee.add(sellFee);
         }
 
-        //Only turn on one times in 10 minutes to prevent the bot trading
         if(antiBotEnable &&  block.timestamp < activeTime){
             _totalFee = 25;
         }
@@ -938,6 +939,16 @@ contract WorldBetToken is ERC20Detailed, Ownable {
     ) external onlyOwner {
         treasuryReceiver = _treasuryReceiver;
         rewardReceiver = _rewardReceiver;
+    }
+
+    function setTaxFee(uint256 _treasuryFee, uint256 _rewardFee, uint256 _burnFee, uint256 _liquidityFee, uint256 _sellFee) external onlyOwner {
+        require(_treasuryFee.add(_rewardFee).add(_burnFee).add(_liquidityFee).add(_sellFee) <= 25, "Fees must be less than 25%");
+        treasuryFee = _treasuryFee;
+        rewardFee = _rewardFee;
+        burnFee = _burnFee;
+        liquidityFee = _liquidityFee;
+        sellFee = _sellFee;
+        totalFee = treasuryFee.add(rewardFee).add(liquidityFee).add(burnFee);
     }
 
     function setEnableAntiBot() external onlyOwner {
